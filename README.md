@@ -100,9 +100,59 @@ Clients are sorted by churn probability (highest first) and exported to `churn_a
 
 ## Results
 
-The model achieved perfect discrimination on the held-out test set (ROC-AUC = 1.0, PR-AUC = 1.0, no misclassifications). This level of separability likely reflects a small dataset with clearly distinct churn behavior rather than a guarantee of real-world generalization.
+### Dataset Summary
 
-> **Note on overfitting risk:** Near-perfect scores on this kind of dataset warrant caution. Before deploying this model in production, validate on a larger, more recent sample and monitor performance over time (e.g., via a rolling backtest or A/B holdout).
+| Metric | Value |
+|---|---|
+| Total clients (aggregated from transactions) | 2,086 |
+| Observation window | 2023-01-01 → 2023-06-01 |
+| Churn cutoff (inactivity threshold) | 30 days |
+| Churn rate (base rate) | ~29.1% |
+| Training set | 1,564 clients |
+| Test set | 522 clients |
+
+The churn class ratio was preserved almost exactly between the train (29.09% churned) and test (29.12% churned) splits via stratified sampling.
+
+### Model Performance (held-out test set)
+
+| Metric | Score |
+|---|---|
+| ROC-AUC | 1.00 |
+| PR-AUC (Average Precision) | 1.00 |
+| Precision (both classes) | 1.00 |
+| Recall (both classes) | 1.00 |
+| F1-score (both classes) | 1.00 |
+
+**Confusion Matrix**
+
+| | Predicted: Active | Predicted: Churned |
+|---|---|---|
+| **Actual: Active** | 370 | 0 |
+| **Actual: Churned** | 0 | 152 |
+
+The model correctly classified all 522 test clients with zero false positives and zero false negatives.
+
+> **Note on overfitting risk:** A perfect score on every metric is unusual and warrants scrutiny rather than celebration. It likely reflects the fact that engineered features like `recency` are almost definitionally correlated with the churn label itself (churn is defined by the same last-trade date used to compute recency), making the classes trivially separable. Before relying on this model operationally, validate it against a fresh, held-out time period and consider whether the label definition is leaking information into the features.
+
+### Sample Output — Top High-Risk Clients
+
+An excerpt from the generated `churn_action_list.csv`, showing the highest-priority clients for RM follow-up:
+
+| Customer ID | Turnover | Equity (Last) | Recency (days) | Churn Probability | Risk Band |
+|---|---|---|---|---|---|
+| C1003 | 539,238.0 | 4,449,995.0 | 133 | 1.00 | High |
+| C990 | 10,974,344.6 | 2,711,952.0 | 65 | 1.00 | High |
+| C997 | 1,293,645.5 | 1,200,036.0 | 133 | 1.00 | High |
+| C999 | 22,076.1 | 416,426.4 | 49 | 1.00 | High |
+| C995 | 631,787.5 | 2,075,102.0 | 32 | 1.00 | High |
+
+*(Full ranked list of all 2,086 clients is available in [`churn_action_list.csv`](churn_action_list.csv).)*
+
+### Key Takeaways
+
+- The model reliably surfaces clients whose recent trading activity has dropped off, using `recency`, `turnover`, and `net_flow` as the strongest behavioral signals.
+- Roughly 3 in 10 clients in this dataset fall into the churned/dormant category, making retention a material concern rather than an edge case.
+- The ranked action list turns a 2,000+ client base into a short, prioritized queue RMs can act on immediately, rather than manually reviewing raw transaction data.
 
 ## Getting Started
 
